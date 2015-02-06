@@ -1,0 +1,93 @@
+NAME="soundfont-fluid"
+VERSION=3.1
+RELEASE=1
+CATEGORY="Audio"
+SUMMARY="Default GM/GS soundfont"
+DESCRIPTION="FluidR3 is the third release of Frank Wen's pro-quality GM/GS
+soundfont. The soundfont has lots of excellent samples, including all the
+GM instruments along side with the GS instruments that are recycled and
+reprogrammed versions of the GM presets."
+HOMEPAGE="http://www.hammersound.com/cgi-bin/soundlink.pl?action=view_category&category=Collections&ListStart=0&ListLength=20"
+SRC_URI="
+	mirror://debian/pool/main/f/fluid-soundfont/fluid-soundfont_${VERSION}.orig.tar.gz
+	http://pkgs.fedoraproject.org/repo/pkgs/fluid-soundfont/Fluid_R3_Readme.pdf/01e65cc3ac20381b3b42f0b7a9e4a055/Fluid_R3_Readme.pdf
+	fedora/fluid3gm.cfg
+	fedora/fluid3gs.cfg
+	fedora/fluid_altassign.cfg
+	fedora/timidity++.cfg
+"
+SRC_DIR="fluid-soundfont-${VERSION}"
+
+ARCH=noarch
+
+PKG_NAMES="${NAME}-gm ${NAME}-gs ${NAME}-lite-patches"
+# for fluidsynth, qsynth, timidity++
+soundfont_fluid_gm_CONTENTS="
+	etc/timidity++.cfg
+	usr/share/soundfonts/default.sf2
+	usr/share/soundfonts/FluidR3_GM.sf2
+	usr/share/soundfonts/fluid3gm.cfg
+	usr/share/soundfonts/fluid_altassign.cfg
+	usr/share/sounds/sf2/default.sf2
+	usr/share/doc/${NAME}/
+"
+soundfont_fluid_gs_REQUIRES="soundfont-fluid-gm"
+soundfont_fluid_gs_CONTENTS="
+	usr/share/soundfonts/FluidR3_GS.sf2
+	usr/share/soundfonts/fluid3gs.cfg
+"
+# for gt, libtimidity, wildmidi
+soundfont_fluid_lite_patches_DOCS="COPYING"
+soundfont_fluid_lite_patches_OBSOLETES="timidity-freepats"
+soundfont_fluid_lite_patches_CONTENTS="
+	etc/timidity.cfg
+	usr/share/soundfonts/fluid-lite-patches/
+"
+
+src_compile() {
+	check_prog_req unsf soundfont-utils
+
+	lndirs
+	cd ${B}
+	unsf -v -s -m FluidR3_GM.sf2
+	unsf -v -s -m FluidR3_GS.sf2
+
+	for bank in GM-B{8,9,16} Standard{1,2,3,4,5,6,7} Room{1,2,3,4,5,6,7} Power{1,2,3} Jazz{1,2,3,4} Brush{1,2}
+	do
+		sed -i "/$bank/d" FluidR3_GM.cfg
+		rm -fr *$bank*
+	done
+
+	cat FluidR3_GM.cfg FluidR3_GS.cfg > FluidR3.cfg
+
+	sed -i 's|FluidR3_GM-|/usr/share/soundfonts/fluid-lite-patches/FluidR3_GM-|g' FluidR3.cfg
+	sed -i 's|FluidR3_GS-|/usr/share/soundfonts/fluid-lite-patches/FluidR3_GS-|g' FluidR3.cfg
+}
+
+src_install() {
+	cd ${B}
+
+	# The actual soundfonts:
+	mkdir -p ${D}/usr/share/soundfonts
+	mkdir -p ${D}/usr/share/sounds/sf2
+	install -p -m 644 FluidR3_GM.sf2 ${D}/usr/share/soundfonts
+	install -p -m 644 FluidR3_GS.sf2 ${D}/usr/share/soundfonts
+	# Create a symlink to denote that this is the default soundfont
+	ln -s FluidR3_GM.sf2 ${D}/usr/share/soundfonts/default.sf2
+	ln -s ../../soundfonts/default.sf2 ${D}/usr/share/sounds/sf2
+
+	# timidity++.cfg files for usage of the sf2 files with the real timidity
+	mkdir -p ${D}/etc
+	install -p -m 644 timidity++.cfg ${D}/etc
+	install -p -m 644 fluid{3gm,3gs,_altassign}.cfg ${D}/usr/share/soundfonts
+
+	# Gus patches + timidity.cfg, for programs which want the "old" timidity.cfg
+	mkdir -p ${D}/usr/share/soundfonts/fluid-lite-patches
+	cp -a FluidR3_GM-* ${D}/usr/share/soundfonts/fluid-lite-patches
+	cp -a FluidR3_GS-* ${D}/usr/share/soundfonts/fluid-lite-patches
+	install -p -m 644 FluidR3.cfg ${D}/etc/timidity.cfg
+
+	# cannot use make_etc_defaults here, they go into separate packages
+
+	dodoc ${S}/Fluid_R3_Readme.pdf
+}
